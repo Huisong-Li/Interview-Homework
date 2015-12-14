@@ -1,32 +1,33 @@
-# -*- coding: utf-8 -*- 
+# -*- coding=gb2312 -*-
 import pandas as pd
 import xlrd
-from pandas import ExcelWriter
-from pandas import ExcelFile
+
 
 data = xlrd.open_workbook('富善优享7号_外贸信托-富善优享7号集合资金信托计划_2015-05-21.xls')
-table = data.sheet_by_name(u'Sheet1')
-a = table.col_values(1)
-n = 1
-for i in a:
-    # i.encode('utf-8')
-    # print(i)
-    
-    if i.encode('utf-8') == '1002:':
-		print(n)
+table = data.sheet_by_name('Sheet1')
+col_values_list = table.col_values(1)
+header_parameter  = 1
+for col_values in col_values_list:
+
+    if col_values== u'科目代码':
+		print(header_parameter)
 		break
-    n = n + 1
-    
-"""
+    header_parameter = header_parameter + 1
+skip_footer_parameter = 1     
+for col_values in col_values_list:
+
+    if col_values== u'':
+		print(skip_footer_parameter)
+		break
+    skip_footer_parameter = skip_footer_parameter + 1
+
+  
 # load the sheet into the Pandas Dataframe structure
-df = pd.read_excel('2.xls', sheetname='Sheet1', header = 0 ,skip_footer = 0)
+
+df = pd.read_excel('富善优享7号_外贸信托-富善优享7号集合资金信托计划_2015-05-21.xls', sheetname='Sheet1', header = header_parameter-1 ,skip_footer = len(col_values_list)-skip_footer_parameter-1)
 
 print(df.describe)
-
-
 print("The list of row indicies")
 print(df.index)
 print("The column headings")
 print(df.columns)
-
-"""
