@@ -1,6 +1,7 @@
 # -*- coding=gb2312 -*-
 import pandas as pd
 import xlrd
+import MySQLdb
 
 # intercepte excel
 
@@ -14,28 +15,75 @@ def interception(xlsfile,sheet,index_col,header_target,skip_footer_target):
 	for col_values in col_values_list:
 
 		if col_values== unicode(header_target,'gb2312'):
-			print(header_parameter)
+			# print(header_parameter)
 			break
 		header_parameter = header_parameter + 1
       
 	for col_values in col_values_list:
 
 		if col_values== unicode(skip_footer_target,'gb2312'):
-			print(skip_footer_parameter)
+			# print(skip_footer_parameter)
 			break
 		skip_footer_parameter = skip_footer_parameter + 1
 
   
 	# load the sheet into the Pandas Dataframe structure
 
-	df = pd.read_excel(xlsfile, sheetname=sheet, header = header_parameter-1 ,skip_footer = len(col_values_list)-skip_footer_parameter-1)
+	df = pd.read_excel(xlsfile, sheetname=sheet, header = header_parameter-1 ,skip_footer = len(col_values_list)-skip_footer_parameter+1)
 	
+	'''
 	print(df.describe)
 	print("The list of row indicies")
 	print(df.index)
 	print("The column headings")
 	print(df.columns)
+	'''
+	return df
+	
+def readrow(df):
+	i = 0
+	# a = len(df.index)
+	# a = df.iloc[0][u'科目代码']
+	while i < len(df.index):
+		a = df.iloc[i][u'估值增值']
+		print(a)
+		i = i + 1
+
+def createMySQL():
+    
+    conn = MySQLdb.connect(host='localhost', user='root',passwd='564753')  
+    cursor = conn.cursor()  
+    cursor.execute("""create database if not exists Homework """)  
+    conn.select_db('homework')
+    sql = '''create table IF NOT EXISTS portHolding(
+			 port_ID varchar(20),
+			 L_DATE varchar(8) NOT NULL,
+			 fund_ID varchar(20),
+			 POSITION_FLAG varchar(10),
+			 MARKET_NO varchar(5),
+			 VC_INTER_CODE varchar(10),
+			 security_code varchar(20),
+			 security_Type varchar(10),
+			 L_CURRENT_AMOUNT float,
+			 unit_Cost float,
+			 cost float,
+			 market_Price float,
+			 market_Value float,
+			 PandL float,
+			 BEGIN_AMOUNT float,
+			 BUY_AMOUNT float,
+			 sale_amount float,
+			 buy_Cash float,
+			 sale_Cash float,
+			 BUY_FEE float,
+			 SALE_FEE float,
+             TODAY_PROFIT float,
+             PRIMARY KEY (L_DATE,port_ID,fund_ID))''' 
+    cursor.execute(sql)  	
+    conn.close()
 	
 if __name__ == "__main__":
-	interception('富善优享7号_外贸信托-富善优享7号集合资金信托计划_2015-05-21.xls','Sheet1',1,'科目代码','')
+	createMySQL()
+	#block = interception('富善优享7号_外贸信托-富善优享7号集合资金信托计划_2015-05-21.xls','Sheet1',1,'科目代码','')
+	#readrow(block)
 	# interception('证券投资基金估值表_双隆1号_2014-12-19.xls','Sheet1',0,'科目代码','')
