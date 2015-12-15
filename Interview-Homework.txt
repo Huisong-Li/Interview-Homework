@@ -3,7 +3,6 @@ import pandas as pd
 import xlrd
 import MySQLdb
 
-# intercepte excel
 
 def interception(xlsfile,sheet,index_col,header_target,skip_footer_target):
 
@@ -26,9 +25,6 @@ def interception(xlsfile,sheet,index_col,header_target,skip_footer_target):
 			break
 		skip_footer_parameter = skip_footer_parameter + 1
 
-  
-	# load the sheet into the Pandas Dataframe structure
-
 	df = pd.read_excel(xlsfile, sheetname=sheet, header = header_parameter-1 ,skip_footer = len(col_values_list)-skip_footer_parameter+1)
 	
 	'''
@@ -38,16 +34,42 @@ def interception(xlsfile,sheet,index_col,header_target,skip_footer_target):
 	print("The column headings")
 	print(df.columns)
 	'''
+	
 	return df
 	
-def readrow(df):
+def readRow(df):
 	i = 0
-	# a = len(df.index)
-	# a = df.iloc[0][u'科目代码']
 	while i < len(df.index):
-		a = df.iloc[i][u'估值增值']
+		a = df.iloc[i][u'数量']	
 		print(a)
 		i = i + 1
+
+def getElement(col,row_series):
+	element = row_series[col]
+	return element
+
+def insertData(df):
+
+    conn = MySQLdb.connect('localhost', 'root', '564753', 'Homework') 
+    cursor = conn.cursor()
+    i = 0   
+    while i < len(df.index):
+		row_series = df.iloc[i]
+		# print(row_series)
+		i = i + 1
+		L_CURRENT_AMOUNT = getElement(u'数量',row_series)
+		if pd.isnull(L_CURRENT_AMOUNT):
+		    cursor.execute('''insert into portHolding (L_CURRENT_AMOUNT)VALUES(null)''')
+		else:
+			cursor.execute('''insert into portHolding (L_CURRENT_AMOUNT)VALUES(%s)''',L_CURRENT_AMOUNT)
+		unit_Cost = getElement(u'单位成本',row_series)
+		if pd.isnull(unit_Cost):
+		    cursor.execute('''insert into portHolding (unit_Cost)VALUES(null)''')
+		else:
+			cursor.execute('''insert into portHolding (unit_Cost)VALUES(%s)''',unit_Cost)
+		#print(type(L_CURRENT_AMOUNT))
+    conn.commit()    
+    cursor.close()
 
 def createMySQL():
     
@@ -57,7 +79,7 @@ def createMySQL():
     conn.select_db('homework')
     sql = '''create table IF NOT EXISTS portHolding(
 			 port_ID varchar(20),
-			 L_DATE varchar(8) NOT NULL,
+			 L_DATE varchar(8),
 			 fund_ID varchar(20),
 			 POSITION_FLAG varchar(10),
 			 MARKET_NO varchar(5),
@@ -77,13 +99,13 @@ def createMySQL():
 			 sale_Cash float,
 			 BUY_FEE float,
 			 SALE_FEE float,
-             TODAY_PROFIT float,
-             PRIMARY KEY (L_DATE,port_ID,fund_ID))''' 
+             TODAY_PROFIT float)''' 
     cursor.execute(sql)  	
-    conn.close()
+    cursor.close()
 	
 if __name__ == "__main__":
-	createMySQL()
-	#block = interception('富善优享7号_外贸信托-富善优享7号集合资金信托计划_2015-05-21.xls','Sheet1',1,'科目代码','')
-	#readrow(block)
+	#createMySQL()
+	block = interception('富善优享7号_外贸信托-富善优享7号集合资金信托计划_2015-05-21.xls','Sheet1',1,'科目代码','')
+	# readrow(block)
+	insertData(block)
 	# interception('证券投资基金估值表_双隆1号_2014-12-19.xls','Sheet1',0,'科目代码','')
