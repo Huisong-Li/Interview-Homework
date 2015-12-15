@@ -2,32 +2,40 @@
 import pandas as pd
 import xlrd
 
+# intercepte excel
 
-data = xlrd.open_workbook('富善优享7号_外贸信托-富善优享7号集合资金信托计划_2015-05-21.xls')
-table = data.sheet_by_name('Sheet1')
-col_values_list = table.col_values(1)
-header_parameter  = 1
-for col_values in col_values_list:
+def interception(xlsfile,sheet,index_col,header_target,skip_footer_target):
 
-    if col_values== u'科目代码':
-		print(header_parameter)
-		break
-    header_parameter = header_parameter + 1
-skip_footer_parameter = 1     
-for col_values in col_values_list:
+	data = xlrd.open_workbook(xlsfile)
+	table = data.sheet_by_name(sheet)
+	col_values_list = table.col_values(index_col)
+	header_parameter  = 1
+	skip_footer_parameter = 1   
+	for col_values in col_values_list:
 
-    if col_values== u'':
-		print(skip_footer_parameter)
-		break
-    skip_footer_parameter = skip_footer_parameter + 1
+		if col_values== unicode(header_target,'gb2312'):
+			print(header_parameter)
+			break
+		header_parameter = header_parameter + 1
+      
+	for col_values in col_values_list:
+
+		if col_values== unicode(skip_footer_target,'gb2312'):
+			print(skip_footer_parameter)
+			break
+		skip_footer_parameter = skip_footer_parameter + 1
 
   
-# load the sheet into the Pandas Dataframe structure
+	# load the sheet into the Pandas Dataframe structure
 
-df = pd.read_excel('富善优享7号_外贸信托-富善优享7号集合资金信托计划_2015-05-21.xls', sheetname='Sheet1', header = header_parameter-1 ,skip_footer = len(col_values_list)-skip_footer_parameter-1)
-
-print(df.describe)
-print("The list of row indicies")
-print(df.index)
-print("The column headings")
-print(df.columns)
+	df = pd.read_excel(xlsfile, sheetname=sheet, header = header_parameter-1 ,skip_footer = len(col_values_list)-skip_footer_parameter-1)
+	
+	print(df.describe)
+	print("The list of row indicies")
+	print(df.index)
+	print("The column headings")
+	print(df.columns)
+	
+if __name__ == "__main__":
+	interception('富善优享7号_外贸信托-富善优享7号集合资金信托计划_2015-05-21.xls','Sheet1',1,'科目代码','')
+	# interception('证券投资基金估值表_双隆1号_2014-12-19.xls','Sheet1',0,'科目代码','')
