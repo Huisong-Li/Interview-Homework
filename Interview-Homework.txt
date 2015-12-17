@@ -3,55 +3,168 @@ import pandas as pd
 import xlrd
 import MySQLdb
 import re
+import sys
+
+class RowData(object):
+	
+	def __init__(self):
+		self.port_ID = None
+		self.L_DATE = None
+		self.fund_ID = None
+		self.POSITION_FLAG = None
+		self.MARKET_NO = None
+		self.VC_INTER_CODE = None
+		self.security_code = None
+		self.security_Type = None
+		self.L_CURRENT_AMOUNT = None
+		self.unit_Cost = None
+		self.cost = None
+		self.market_Price = None
+		self.market_Value = None
+		self.PandL = None
+		self.BEGIN_AMOUNT = None
+		self.BUY_AMOUNT = None
+		self.sale_amount = None
+		self.buy_Cash = None
+		self.sale_Cash = None
+		self.BUY_FEE = None
+		self.SALE_FEE = None
+		self.TODAY_PROFIT = None
+
+class Transfer(object):
+	
+	def __init__(self,file_name,port_ID,sheet,index,header,footer):
+		self.file_name = file_name
+		self.port_ID = port_ID
+		self.sheet = sheet
+		self.index = index
+		self.header = header
+		self.footer = footer
+		
+	def interception(self):
+
+		data = xlrd.open_workbook(self.file_name)
+		table = data.sheet_by_name(self.sheet)
+		col_values_list = table.col_values(self.index)
+		header_parameter  = 1
+		skip_footer_parameter = 1   
+		for col_values in col_values_list:
+
+			if col_values== unicode(self.header,'gb2312'):
+				# print(header_parameter)
+				break
+			header_parameter = header_parameter + 1
+      
+		for col_values in col_values_list:
+
+			if col_values== unicode(self.footer,'gb2312'):
+				# print(skip_footer_parameter)
+				break
+			skip_footer_parameter = skip_footer_parameter + 1
+
+		df = pd.read_excel(self.file_name, sheetname=self.sheet, header = header_parameter-1 ,skip_footer = len(col_values_list)-skip_footer_parameter+1)
+		return df
+		
+	def insertData(self,df):
+		conn = MySQLdb.connect('localhost', 'root', '564753', 'Homework') 
+		cursor = conn.cursor()
+		content = self.file_name
+		regexp = '.*(\d{4}-\d{2}-\d{2}).xls'
+		L_DATE = GetRE(content, regexp)
+		L_YEAR = GetRE(L_DATE[0],'(\d{4})-\d{2}-\d{2}')
+		L_MOUTH = GetRE(L_DATE[0],'\d{4}-(\d{2})-\d{2}')
+		L_DAY = GetRE(L_DATE[0],'\d{4}-\d{2}-(\d{2})')
+		
+		i = 0
+		while i < len(df.index):
+			
+			row_series = df.iloc[i]
+			i = i + 1
+			temp = []
+			new_row = RowData()
+			new_row.port_ID = self.port_ID
+			new_row.L_DATE = L_YEAR[0]+L_MOUTH[0]+L_DAY[0]
+			
+			if pd.notnull(getElement(u'数量',row_series)):
+				new_row.L_CURRENT_AMOUNT = getElement(u'数量',row_series)
+				
+			if pd.notnull(getElement(u'单位成本',row_series)):
+				new_row.unit_Cost = getElement(u'单位成本',row_series)
+				
+			if pd.notnull(getElement(u'成本',row_series)):
+				new_row.cost = getElement(u'成本',row_series)
+				
+			if pd.notnull(getElement(u'市价',row_series)):
+				new_row.market_Price = getElement(u'市价',row_series)
+				
+			if pd.notnull(getElement(u'市值',row_series)):
+				new_row.market_Value = getElement(u'市值',row_series)
+				
+			if pd.notnull(getElement(u'估值增值',row_series)):
+				new_row.PandL = getElement(u'估值增值',row_series)
+			project_code = getElement(u'科目代码',row_series)
+			if GetRE(project_code,'^10(.*)') != []:
+				new_row.POSITION_FLAG = 'long'
+				new_row.security_Type = 'deposit'
+			if GetRE(project_code,'^1202(.*)') != []:
+				new_row.security_Type = 'repo'
+			if GetRE(project_code,'^1204(.*)') != []:
+				new_row.POSITION_FLAG = 'long'
+				new_row.security_Type = 'deposit'
+			if GetRE(project_code,'^110104(.*)') or GetRE(project_code,'^1105(.*)') != []:
+				new_row.security_Type = 'fund'
+			if GetRE(project_code,'^110101(.*)') != []:
+				new_row.security_Type = 'stock'
+				if GetRE(project_code,'^11010101(.*)') != []:
+					new_row.MARKET_NO = 'SH'
+					if GetRE(project_code,'^1101010101(.+)') != []:
+						temp = GetRE(project_code,'^1101010101(.*)')
+						new_row.security_code = temp[0]
+				if GetRE(project_code,'^11010131(.*)') or GetRE(project_code,'^11010141(.*)') != []:
+					new_row.MARKET_NO = 'SZ'
+					if GetRE(project_code,'^11010131(.*)') != []:
+						if GetRE(project_code,'^1101013101(.+)') != []:
+							temp = GetRE(project_code,'^1101013101(.*)')
+							new_row.security_code = temp[0]
+					if GetRE(project_code,'^11010141(.*)') != []:
+						if GetRE(project_code,'^1101014101(.+)') != []:
+							temp = GetRE(project_code,'^1101014101(.*)')
+							new_row.security_code = temp[0]
+			if GetRE(project_code,'^3(.*)') != []:
+				new_row.MARKET_NO = 'ZJS'
+				new_row.security_Type = 'future'
+				if GetRE(project_code,'.*IF(.*)') != []:
+					temp = GetRE(project_code,'.*(IF.*)')
+					new_row.security_code = temp[0]
+				if GetRE(project_code,'.*IC(.*)') != []:
+					temp = GetRE(project_code,'.*(IC.*)')
+					new_row.security_code = temp[0]
+				if GetRE(project_code,'.*IH(.*)') != []:
+					temp = GetRE(project_code,'.*(IH.*)')
+					new_row.security_code = temp[0]
+			
+			value = [new_row.port_ID,new_row.L_DATE,new_row.POSITION_FLAG,new_row.MARKET_NO,new_row.security_code,new_row.security_Type,new_row.L_CURRENT_AMOUNT,new_row.unit_Cost,new_row.cost,new_row.market_Price,new_row.market_Value,new_row.PandL]
+			cursor.execute('''insert into portHolding 
+							(port_ID,L_DATE,POSITION_FLAG,MARKET_NO,security_code,security_Type,L_CURRENT_AMOUNT,unit_Cost,cost,market_Price,market_Value,PandL)
+							VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)''',value)
+		conn.commit()
+		cursor.close()
 
 def GetRE(content,regexp):
-    temp = re.findall(regexp,content)
-    return temp
+	temp = re.findall(regexp,content)
+	return temp
 
 def getElement(col,row_series):
 	element = row_series[col]
 	return element
-    
-def interception(xlsfile,sheet,index_col,header_target,skip_footer_target):
-
-	data = xlrd.open_workbook(xlsfile)
-	table = data.sheet_by_name(sheet)
-	col_values_list = table.col_values(index_col)
-	header_parameter  = 1
-	skip_footer_parameter = 1   
-	for col_values in col_values_list:
-
-		if col_values== unicode(header_target,'gb2312'):
-			# print(header_parameter)
-			break
-		header_parameter = header_parameter + 1
-      
-	for col_values in col_values_list:
-
-		if col_values== unicode(skip_footer_target,'gb2312'):
-			# print(skip_footer_parameter)
-			break
-		skip_footer_parameter = skip_footer_parameter + 1
-
-	df = pd.read_excel(xlsfile, sheetname=sheet, header = header_parameter-1 ,skip_footer = len(col_values_list)-skip_footer_parameter+1)
-	
-	'''
-	print(df.describe)
-	print("The list of row indicies")
-	print(df.index)
-	print("The column headings")
-	print(df.columns)
-	'''
-	
-	return df
 
 def createMySQL():
-    
-    conn = MySQLdb.connect(host='localhost', user='root',passwd='564753')  
-    cursor = conn.cursor()  
-    cursor.execute("""create database if not exists Homework """)  
-    conn.select_db('homework')
-    sql = '''create table IF NOT EXISTS portHolding(
+	
+	conn = MySQLdb.connect(host='localhost', user='root',passwd='564753')  
+	cursor = conn.cursor()  
+	cursor.execute("""create database if not exists Homework """)  
+	conn.select_db('homework')
+	sql = '''create table IF NOT EXISTS portHolding(
 			 port_ID varchar(20),
 			 L_DATE varchar(8),
 			 fund_ID varchar(20),
@@ -73,124 +186,28 @@ def createMySQL():
 			 sale_Cash float,
 			 BUY_FEE float,
 			 SALE_FEE float,
-             TODAY_PROFIT float)''' 
-    cursor.execute(sql)  	
-    cursor.close()
-    
-def insertData(file_name,port_ID,df):
-	conn = MySQLdb.connect('localhost', 'root', '564753', 'Homework') 
-	cursor = conn.cursor()
-	
-	content = file_name
-	regexp = '.*(\d{4}-\d{2}-\d{2}).xls'
-	L_DATE = GetRE(content, regexp)
-	L_YEAR = GetRE(L_DATE[0],'(\d{4})-\d{2}-\d{2}')
-	L_MOUTH = GetRE(L_DATE[0],'\d{4}-(\d{2})-\d{2}')
-	L_DAY = GetRE(L_DATE[0],'\d{4}-\d{2}-(\d{2})')
-	L_DATE = L_YEAR[0]+L_MOUTH[0]+L_DAY[0]
-	
-	
-	# print(L_DATE)
-	i = 0
-	while i < len(df.index):
-		row_series = df.iloc[i]
-		i = i + 1
-		temp = []
-		
-		L_CURRENT_AMOUNT = getElement(u'数量',row_series)
-		if pd.isnull(L_CURRENT_AMOUNT):
-			L_CURRENT_AMOUNT = None
-			
-		unit_Cost = getElement(u'单位成本',row_series)
-		if pd.isnull(unit_Cost):
-		    unit_Cost = None
-			
-		cost = getElement(u'成本',row_series)
-		if pd.isnull(cost):
-		   cost = None
-		
-		market_Price = getElement(u'市价',row_series)
-		if pd.isnull(market_Price):
-		   market_Price = None
-		
-		market_Value = getElement(u'市值',row_series)
-		if pd.isnull(market_Value):
-		   market_Value = None
-		
-		PandL = getElement(u'估值增值',row_series)
-		if pd.isnull(PandL):
-		   PandL = None
-		 
-		project_code = getElement(u'科目代码',row_series) 
-		# temp = GetRE(project_code,'^10(.*)')
-		if GetRE(project_code,'^10(.*)') != []:
-			POSITION_FLAG = 'long'
-			MARKET_NO = None
-			security_code = None
-			security_Type = 'deposit'
-			#test = [POSITION_FLAG,MARKET_NO,security_code,security_Type]
-			#print(test)
-		if GetRE(project_code,'^1202(.*)') != []:
-			POSITION_FLAG = None
-			MARKET_NO = None
-			security_code = None
-			security_Type = 'repo'
-		if GetRE(project_code,'^1204(.*)') != []:
-			POSITION_FLAG = 'long'
-			MARKET_NO = None
-			security_code = None
-			security_Type = 'deposit'
-		if GetRE(project_code,'^110104(.*)') or GetRE(project_code,'^1105(.*)') != []:
-			POSITION_FLAG = None
-			MARKET_NO = None
-			security_code = None
-			security_Type = 'fund'
-		if GetRE(project_code,'^110101(.*)') != []:
-			POSITION_FLAG = None
-			security_Type = 'stock'
-			if GetRE(project_code,'^11010101(.*)') != []:
-				MARKET_NO = 'SH'
-				security_code = None
-				if GetRE(project_code,'^1101010101(.+)') != []:
-					temp = GetRE(project_code,'^1101010101(.*)')
-					security_code = temp[0]
-			if GetRE(project_code,'^11010131(.*)') or GetRE(project_code,'^11010141(.*)') != []:
-				MARKET_NO = 'SZ'
-				security_code = None
-				if GetRE(project_code,'^11010131(.*)') != []:
-					if GetRE(project_code,'^1101013101(.+)') != []:
-						temp = GetRE(project_code,'^1101013101(.*)')
-						security_code = temp[0]
-				if GetRE(project_code,'^11010141(.*)') != []:
-					if GetRE(project_code,'^1101014101(.+)') != []:
-						temp = GetRE(project_code,'^1101014101(.*)')
-						security_code = temp[0]
-		if GetRE(project_code,'^3(.*)') != []:
-			POSITION_FLAG = None
-			MARKET_NO = 'ZJS'
-			security_Type = 'future'
-			security_code = None
-			if GetRE(project_code,'.*IF(.*)') != []:
-				temp = GetRE(project_code,'.*(IF.*)')
-				security_code = temp[0]
-			if GetRE(project_code,'.*IC(.*)') != []:
-				temp = GetRE(project_code,'.*(IC.*)')
-				security_code = temp[0]
-			if GetRE(project_code,'.*IH(.*)') != []:
-				temp = GetRE(project_code,'.*(IH.*)')
-				security_code = temp[0]
-		
-		value = [port_ID,L_DATE,POSITION_FLAG,MARKET_NO,security_code,security_Type,L_CURRENT_AMOUNT,unit_Cost,cost,market_Price,market_Value,PandL]
-		cursor.execute('''insert into portHolding 
-		                  (port_ID,L_DATE,POSITION_FLAG,MARKET_NO,security_code,security_Type,L_CURRENT_AMOUNT,unit_Cost,cost,market_Price,market_Value,PandL)
-		                  VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)''',value)
-	conn.commit()    
+			 TODAY_PROFIT float)''' 
+	cursor.execute(sql)
 	cursor.close()
-	
+
+def main():
+	create = raw_input("Database established?[Yes or No]\n")
+	if create == 'No':
+		createMySQL()
+	file_name = raw_input("Please enter xls file name: \n")
+	port_ID = raw_input("Please enter port ID (limit 10 characters): \n")
+	sheet = raw_input("Please enter sheet name: \n")
+	index = int(raw_input("Please enter index number: \n"))
+	header = raw_input("Please enter header parameter : \n")
+	footer = raw_input("Please enter footer parameter : \n")
+	confirm = raw_input("Information confirmed?[Yes or No]\n")
+	if confirm == 'No':
+		main()
+		sys.exit('Function completed')
+	new_task = Transfer(file_name,port_ID,sheet,index,header,footer)
+	block = new_task.interception()
+	new_task.insertData(block)
+	sys.exit('\nFunction completed')
 	
 if __name__ == "__main__":
-	createMySQL()
-	block = interception('富善优享7号_外贸信托-富善优享7号集合资金信托计划_2015-05-21.xls','Sheet1',1,'科目代码','')
-	file_name = raw_input("输入想要载入分析的XLS文件名称：")
-	port_ID = raw_input("输入此文件对应的投资组合ID：")
-	insertData(file_name,port_ID,block)
+	main()
