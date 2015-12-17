@@ -2,8 +2,16 @@
 import pandas as pd
 import xlrd
 import MySQLdb
+import re
 
+def GetRE(content,regexp):
+    temp = re.findall(regexp,content)
+    return temp
 
+def getElement(col,row_series):
+	element = row_series[col]
+	return element
+    
 def interception(xlsfile,sheet,index_col,header_target,skip_footer_target):
 
 	data = xlrd.open_workbook(xlsfile)
@@ -36,67 +44,15 @@ def interception(xlsfile,sheet,index_col,header_target,skip_footer_target):
 	'''
 	
 	return df
-	
-def readRow(df):
-	i = 0
+
+def insertInfo(df):
+	i = 0   
 	while i < len(df.index):
-		a = df.iloc[i][u'数量']	
-		print(a)
-		i = i + 1
-
-def getElement(col,row_series):
-	element = row_series[col]
-	return element
-
-def insertData(df):
-
-    conn = MySQLdb.connect('localhost', 'root', '564753', 'Homework') 
-    cursor = conn.cursor()
-    i = 0   
-    while i < len(df.index):
 		row_series = df.iloc[i]
 		# print(row_series)
 		i = i + 1
-		
-		L_CURRENT_AMOUNT = getElement(u'数量',row_series)
-		if pd.isnull(L_CURRENT_AMOUNT):
-		    cursor.execute('''insert into portHolding (L_CURRENT_AMOUNT)VALUES(null)''')
-		else:
-			cursor.execute('''insert into portHolding (L_CURRENT_AMOUNT)VALUES(%s)''',L_CURRENT_AMOUNT)
-		
-		unit_Cost = getElement(u'单位成本',row_series)
-		if pd.isnull(unit_Cost):
-		    cursor.execute('''insert into portHolding (unit_Cost)VALUES(null)''')
-		else:
-			cursor.execute('''insert into portHolding (unit_Cost)VALUES(%s)''',unit_Cost)
-			
-		cost = getElement(u'成本',row_series)
-		if pd.isnull(cost):
-		    cursor.execute('''insert into portHolding (cost)VALUES(null)''')
-		else:
-			cursor.execute('''insert into portHolding (cost)VALUES(%s)''',cost)
-		
-		market_Price = getElement(u'市价',row_series)
-		if pd.isnull(market_Price):
-		    cursor.execute('''insert into portHolding (market_Price)VALUES(null)''')
-		else:
-			cursor.execute('''insert into portHolding (market_Price)VALUES(%s)''',market_Price)
-		
-		market_Value = getElement(u'市值',row_series)
-		if pd.isnull(market_Value):
-		    cursor.execute('''insert into portHolding (market_Value)VALUES(null)''')
-		else:
-			cursor.execute('''insert into portHolding (market_Value)VALUES(%s)''',market_Value)
-		
-		PandL = getElement(u'估值增值',row_series)
-		if pd.isnull(PandL):
-		    cursor.execute('''insert into portHolding (PandL)VALUES(null)''')
-		else:
-			cursor.execute('''insert into portHolding (PandL)VALUES(%s)''',PandL)
-		
-		#print(type(L_CURRENT_AMOUNT))
-    conn.commit()    
-    cursor.close()
+		project_code = getElement(u'科目代码',row_series)
+		print(project_code)
 
 def createMySQL():
     
@@ -129,10 +85,62 @@ def createMySQL():
              TODAY_PROFIT float)''' 
     cursor.execute(sql)  	
     cursor.close()
+    
+def insertData(file_name,port_ID,df):
+	conn = MySQLdb.connect('localhost', 'root', '564753', 'Homework') 
+	cursor = conn.cursor()
+	
+	content = file_name
+	regexp = '.*(\d{4}-\d{2}-\d{2}).xls'
+	L_DATE = GetRE(content, regexp)
+	L_YEAR = GetRE(L_DATE[0],'(\d{4})-\d{2}-\d{2}')
+	L_MOUTH = GetRE(L_DATE[0],'\d{4}-(\d{2})-\d{2}')
+	L_DAY = GetRE(L_DATE[0],'\d{4}-\d{2}-(\d{2})')
+	L_DATE = L_YEAR[0]+L_MOUTH[0]+L_DAY[0]
+	
+	
+	# print(L_DATE)
+	i = 0
+	while i < len(df.index):
+		row_series = df.iloc[i]
+		i = i + 1
+		
+		L_CURRENT_AMOUNT = getElement(u'数量',row_series)
+		if pd.isnull(L_CURRENT_AMOUNT):
+			L_CURRENT_AMOUNT = None
+			
+		unit_Cost = getElement(u'单位成本',row_series)
+		if pd.isnull(unit_Cost):
+		    unit_Cost = None
+			
+		cost = getElement(u'成本',row_series)
+		if pd.isnull(cost):
+		   cost = None
+		
+		market_Price = getElement(u'市价',row_series)
+		if pd.isnull(market_Price):
+		   market_Price = None
+		
+		market_Value = getElement(u'市值',row_series)
+		if pd.isnull(market_Value):
+		   market_Value = None
+		
+		PandL = getElement(u'估值增值',row_series)
+		if pd.isnull(PandL):
+		   PandL = None
+		   
+		value = [port_ID,L_DATE,L_CURRENT_AMOUNT,unit_Cost,cost,market_Price,market_Value,PandL]
+		cursor.execute('''insert into portHolding 
+		                  (port_ID,L_DATE,L_CURRENT_AMOUNT,unit_Cost,cost,market_Price,market_Value,PandL)
+		                  VALUES(%s,%s,%s,%s,%s,%s,%s,%s)''',value)
+	conn.commit()    
+	cursor.close()
+	
 	
 if __name__ == "__main__":
-	#createMySQL()
+	# createMySQL()
 	block = interception('富善优享7号_外贸信托-富善优享7号集合资金信托计划_2015-05-21.xls','Sheet1',1,'科目代码','')
-	# readrow(block)
-	insertData(block)
-	# interception('证券投资基金估值表_双隆1号_2014-12-19.xls','Sheet1',0,'科目代码','')
+	insertInfo(block)
+	# file_name = raw_input("输入想要载入分析的XLS文件名称：")
+	# port_ID = raw_input("输入此文件对应的投资组合ID：")
+	# insertData(file_name,port_ID,block)
