@@ -45,15 +45,6 @@ def interception(xlsfile,sheet,index_col,header_target,skip_footer_target):
 	
 	return df
 
-def insertInfo(df):
-	i = 0   
-	while i < len(df.index):
-		row_series = df.iloc[i]
-		# print(row_series)
-		i = i + 1
-		project_code = getElement(u'科目代码',row_series)
-		print(project_code)
-
 def createMySQL():
     
     conn = MySQLdb.connect(host='localhost', user='root',passwd='564753')  
@@ -104,6 +95,7 @@ def insertData(file_name,port_ID,df):
 	while i < len(df.index):
 		row_series = df.iloc[i]
 		i = i + 1
+		temp = []
 		
 		L_CURRENT_AMOUNT = getElement(u'数量',row_series)
 		if pd.isnull(L_CURRENT_AMOUNT):
@@ -128,19 +120,77 @@ def insertData(file_name,port_ID,df):
 		PandL = getElement(u'估值增值',row_series)
 		if pd.isnull(PandL):
 		   PandL = None
-		   
-		value = [port_ID,L_DATE,L_CURRENT_AMOUNT,unit_Cost,cost,market_Price,market_Value,PandL]
+		 
+		project_code = getElement(u'科目代码',row_series) 
+		# temp = GetRE(project_code,'^10(.*)')
+		if GetRE(project_code,'^10(.*)') != []:
+			POSITION_FLAG = 'long'
+			MARKET_NO = None
+			security_code = None
+			security_Type = 'deposit'
+			#test = [POSITION_FLAG,MARKET_NO,security_code,security_Type]
+			#print(test)
+		if GetRE(project_code,'^1202(.*)') != []:
+			POSITION_FLAG = None
+			MARKET_NO = None
+			security_code = None
+			security_Type = 'repo'
+		if GetRE(project_code,'^1204(.*)') != []:
+			POSITION_FLAG = 'long'
+			MARKET_NO = None
+			security_code = None
+			security_Type = 'deposit'
+		if GetRE(project_code,'^110104(.*)') or GetRE(project_code,'^1105(.*)') != []:
+			POSITION_FLAG = None
+			MARKET_NO = None
+			security_code = None
+			security_Type = 'fund'
+		if GetRE(project_code,'^110101(.*)') != []:
+			POSITION_FLAG = None
+			security_Type = 'stock'
+			if GetRE(project_code,'^11010101(.*)') != []:
+				MARKET_NO = 'SH'
+				security_code = None
+				if GetRE(project_code,'^1101010101(.+)') != []:
+					temp = GetRE(project_code,'^1101010101(.*)')
+					security_code = temp[0]
+			if GetRE(project_code,'^11010131(.*)') or GetRE(project_code,'^11010141(.*)') != []:
+				MARKET_NO = 'SZ'
+				security_code = None
+				if GetRE(project_code,'^11010131(.*)') != []:
+					if GetRE(project_code,'^1101013101(.+)') != []:
+						temp = GetRE(project_code,'^1101013101(.*)')
+						security_code = temp[0]
+				if GetRE(project_code,'^11010141(.*)') != []:
+					if GetRE(project_code,'^1101014101(.+)') != []:
+						temp = GetRE(project_code,'^1101014101(.*)')
+						security_code = temp[0]
+		if GetRE(project_code,'^3(.*)') != []:
+			POSITION_FLAG = None
+			MARKET_NO = 'ZJS'
+			security_Type = 'future'
+			security_code = None
+			if GetRE(project_code,'.*IF(.*)') != []:
+				temp = GetRE(project_code,'.*(IF.*)')
+				security_code = temp[0]
+			if GetRE(project_code,'.*IC(.*)') != []:
+				temp = GetRE(project_code,'.*(IC.*)')
+				security_code = temp[0]
+			if GetRE(project_code,'.*IH(.*)') != []:
+				temp = GetRE(project_code,'.*(IH.*)')
+				security_code = temp[0]
+		
+		value = [port_ID,L_DATE,POSITION_FLAG,MARKET_NO,security_code,security_Type,L_CURRENT_AMOUNT,unit_Cost,cost,market_Price,market_Value,PandL]
 		cursor.execute('''insert into portHolding 
-		                  (port_ID,L_DATE,L_CURRENT_AMOUNT,unit_Cost,cost,market_Price,market_Value,PandL)
-		                  VALUES(%s,%s,%s,%s,%s,%s,%s,%s)''',value)
+		                  (port_ID,L_DATE,POSITION_FLAG,MARKET_NO,security_code,security_Type,L_CURRENT_AMOUNT,unit_Cost,cost,market_Price,market_Value,PandL)
+		                  VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)''',value)
 	conn.commit()    
 	cursor.close()
 	
 	
 if __name__ == "__main__":
-	# createMySQL()
+	createMySQL()
 	block = interception('富善优享7号_外贸信托-富善优享7号集合资金信托计划_2015-05-21.xls','Sheet1',1,'科目代码','')
-	insertInfo(block)
-	# file_name = raw_input("输入想要载入分析的XLS文件名称：")
-	# port_ID = raw_input("输入此文件对应的投资组合ID：")
-	# insertData(file_name,port_ID,block)
+	file_name = raw_input("输入想要载入分析的XLS文件名称：")
+	port_ID = raw_input("输入此文件对应的投资组合ID：")
+	insertData(file_name,port_ID,block)
