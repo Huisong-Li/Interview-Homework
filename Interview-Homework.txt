@@ -86,9 +86,73 @@ class Transfer(object):
 			
 		return df
 		
+	def projectCode(self,project_code):
+		
+		POSITION_FLAG = None
+		MARKET_NO = None
+		security_code = None
+		security_Type = None
+		
+		if GetRE(project_code,'^10(.*)') != []:
+			POSITION_FLAG = 'long'
+			security_Type = 'deposit'
+					
+		if GetRE(project_code,'^1202(.*)') != []:
+			security_Type = 'repo'
+					
+		if GetRE(project_code,'^1204(.*)') != []:
+			POSITION_FLAG = 'long'
+			security_Type = 'deposit'
+					
+		if GetRE(project_code,'^110104(.*)') or GetRE(project_code,'^1105(.*)') != []:
+			security_Type = 'fund'
+					
+		if GetRE(project_code,'^110101(.*)') != []:
+			security_Type = 'stock'
+					
+			if GetRE(project_code,'^11010101(.*)') != []:
+				MARKET_NO = 'SH'
+				if GetRE(project_code,'^1101010101(.+)') != []:
+					temp = GetRE(project_code,'^1101010101(.*)')
+					security_code = temp[0]
+							
+	        if GetRE(project_code,'^11010131(.*)') or GetRE(project_code,'^11010141(.*)') != []:
+				MARKET_NO = 'SZ'
+						
+				if GetRE(project_code,'^11010131(.*)') != []:
+					if GetRE(project_code,'^1101013101(.+)') != []:
+						temp = GetRE(project_code,'^1101013101(.*)')
+						security_code = temp[0]
+								
+				if GetRE(project_code,'^11010141(.*)') != []:
+					if GetRE(project_code,'^1101014101(.+)') != []:
+						temp = GetRE(project_code,'^1101014101(.*)')
+						security_code = temp[0]
+								
+		if GetRE(project_code,'^3(.*)') != []:
+			MARKET_NO = 'ZJS'
+			security_Type = 'future'
+					
+			if GetRE(project_code,'.*IF(.*)') != []:
+				temp = GetRE(project_code,'.*(IF.*)')
+				security_code = temp[0]
+						
+			if GetRE(project_code,'.*IC(.*)') != []:
+				temp = GetRE(project_code,'.*(IC.*)')
+				security_code = temp[0]
+						
+			if GetRE(project_code,'.*IH(.*)') != []:
+				temp = GetRE(project_code,'.*(IH.*)')
+				security_code = temp[0]
+				
+		solution = [POSITION_FLAG,MARKET_NO,security_code,security_Type]
+			
+		return solution
+		
 	def insertDB(self,df):
 		
 		content = self.file_name
+		##
 		regexp = '.*(\d{4}-\d{2}-\d{2}).xls'
 		L_DATE = GetRE(content, regexp)
 		L_YEAR = GetRE(L_DATE[0],'(\d{4})-\d{2}-\d{2}')
@@ -130,59 +194,14 @@ class Transfer(object):
 					new_row.PandL = getElement(u'估值增值',row_series)
 					
 				project_code = getElement(u'科目代码',row_series)
+					
+				project_code_temp = self.projectCode(project_code)
+					
+				new_row.POSITION_FLAG = project_code_temp[0]
+				new_row.MARKET_NO = project_code_temp[1]
+				new_row.security_code = project_code_temp[2]
+				new_row.security_Type = project_code_temp[3]
 				
-				if GetRE(project_code,'^10(.*)') != []:
-					new_row.POSITION_FLAG = 'long'
-					new_row.security_Type = 'deposit'
-					
-				if GetRE(project_code,'^1202(.*)') != []:
-					new_row.security_Type = 'repo'
-					
-				if GetRE(project_code,'^1204(.*)') != []:
-					new_row.POSITION_FLAG = 'long'
-					new_row.security_Type = 'deposit'
-					
-				if GetRE(project_code,'^110104(.*)') or GetRE(project_code,'^1105(.*)') != []:
-					new_row.security_Type = 'fund'
-					
-				if GetRE(project_code,'^110101(.*)') != []:
-					new_row.security_Type = 'stock'
-					
-					if GetRE(project_code,'^11010101(.*)') != []:
-						new_row.MARKET_NO = 'SH'
-						if GetRE(project_code,'^1101010101(.+)') != []:
-							temp = GetRE(project_code,'^1101010101(.*)')
-							new_row.security_code = temp[0]
-							
-					if GetRE(project_code,'^11010131(.*)') or GetRE(project_code,'^11010141(.*)') != []:
-						new_row.MARKET_NO = 'SZ'
-						
-						if GetRE(project_code,'^11010131(.*)') != []:
-							if GetRE(project_code,'^1101013101(.+)') != []:
-								temp = GetRE(project_code,'^1101013101(.*)')
-								new_row.security_code = temp[0]
-								
-						if GetRE(project_code,'^11010141(.*)') != []:
-							if GetRE(project_code,'^1101014101(.+)') != []:
-								temp = GetRE(project_code,'^1101014101(.*)')
-								new_row.security_code = temp[0]
-								
-				if GetRE(project_code,'^3(.*)') != []:
-					new_row.MARKET_NO = 'ZJS'
-					new_row.security_Type = 'future'
-					
-					if GetRE(project_code,'.*IF(.*)') != []:
-						temp = GetRE(project_code,'.*(IF.*)')
-						new_row.security_code = temp[0]
-						
-					if GetRE(project_code,'.*IC(.*)') != []:
-						temp = GetRE(project_code,'.*(IC.*)')
-						new_row.security_code = temp[0]
-						
-					if GetRE(project_code,'.*IH(.*)') != []:
-						temp = GetRE(project_code,'.*(IH.*)')
-						new_row.security_code = temp[0]
-			
 				value = [new_row.port_ID,new_row.L_DATE,new_row.POSITION_FLAG,new_row.MARKET_NO,new_row.security_code,new_row.security_Type,new_row.L_CURRENT_AMOUNT,new_row.unit_Cost,new_row.cost,new_row.market_Price,new_row.market_Value,new_row.PandL]
 				cursor.execute('''insert into portHolding 
 								(port_ID,L_DATE,POSITION_FLAG,MARKET_NO,security_code,security_Type,L_CURRENT_AMOUNT,unit_Cost,cost,market_Price,market_Value,PandL)
